@@ -1,0 +1,564 @@
+<title>나의 매매일지</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Nanum+Myeongjo:wght@800&display=swap">
+<style>
+/* Layout: 한 줄 장부(ledger) — 위에 목표 진행, 아래 탭으로 보유/기록/통계/원칙. 상승=빨강, 하락=파랑(국내 시장 관례) */
+:root {
+  --paper: #f3f5f2; --surface: #ffffff; --sunken: #e9ede8; --ink: #17201c; --muted: #5b6862; --line: #d9dfd8;
+  --accent: #2b5a4b; --accent-ink: #ffffff; --accent-soft: #dfeae5;
+  --up: #d1323c; --down: #2a5fc4; --warn: #9a6512; --warn-bg: #fbf2df; --bad: #b4232c; --bad-bg: #fbe5e6;
+  --f-display: "Nanum Myeongjo", "Batang", serif;
+  --f-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --f-num: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #101513; --surface: #171e1b; --sunken: #0c100e; --ink: #e4ebe7; --muted: #94a29b; --line: #29322e;
+  --accent: #82c2ac; --accent-ink: #0d1814; --accent-soft: #1d2d27;
+  --up: #ff6e76; --down: #72a0ff; --warn: #e3b45e; --warn-bg: #2a2315; --bad: #ff7d84; --bad-bg: #2e1718; color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --paper: #101513; --surface: #171e1b; --sunken: #0c100e; --ink: #e4ebe7; --muted: #94a29b; --line: #29322e;
+  --accent: #82c2ac; --accent-ink: #0d1814; --accent-soft: #1d2d27;
+  --up: #ff6e76; --down: #72a0ff; --warn: #e3b45e; --warn-bg: #2a2315; --bad: #ff7d84; --bad-bg: #2e1718; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--paper); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 880px; margin: 0 auto; padding-block: 24px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 20px; }
+.num { font-family: var(--f-num); font-variant-numeric: tabular-nums; }
+.up { color: var(--up); } .down { color: var(--down); } .muted { color: var(--muted); }
+h1 { font-family: var(--f-display); font-size: 30px; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+h2 { font-size: 17px; margin: 0; font-weight: 600; text-wrap: balance; }
+h3 { font-size: 14px; margin: 0; font-weight: 600; }
+.label { font-size: 12px; color: var(--muted); letter-spacing: 0.04em; }
+button, .btn { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 8px 14px; font-weight: 500; }
+button:hover { border-color: var(--muted); }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button.primary:disabled { opacity: 0.45; cursor: not-allowed; }
+button.ghost { background: transparent; border-color: transparent; color: var(--muted); padding: 6px 8px; }
+button.danger { color: var(--bad); }
+input, select, textarea { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%; min-width: 0; }
+textarea { resize: vertical; min-height: 72px; }
+
+header.top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; }
+.goal { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; display: grid; gap: 10px; }
+.goal-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; align-items: baseline; }
+.goal-big { font-family: var(--f-num); font-size: 22px; font-weight: 500; }
+.bar { height: 10px; background: var(--sunken); border-radius: 5px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--accent); border-radius: 5px; min-width: 2px; }
+.ticks { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-family: var(--f-num); }
+
+nav.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+nav.tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--muted); padding: 10px 12px; white-space: nowrap; }
+nav.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+.count { font-family: var(--f-num); font-size: 12px; margin-left: 4px; }
+
+.list { display: grid; gap: 12px; }
+.trade { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 10px; }
+.trade-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; align-items: baseline; }
+.trade-name { font-size: 17px; font-weight: 600; }
+.kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px 16px; }
+.kv div { display: grid; gap: 1px; min-width: 0; }
+.kv b { font-family: var(--f-num); font-weight: 500; font-variant-numeric: tabular-nums; }
+.reason { background: var(--sunken); border-radius: 8px; padding: 8px 12px; font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--sunken); color: var(--muted); }
+.chip.bad { background: var(--bad-bg); color: var(--bad); }
+.chip.warn { background: var(--warn-bg); color: var(--warn); }
+.chip.ok { background: var(--accent-soft); color: var(--accent); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.inline-price { display: flex; gap: 6px; align-items: center; }
+.inline-price input { width: 140px; padding: 6px 8px; }
+
+.empty { border: 1px dashed var(--line); border-radius: 12px; padding: 28px 20px; display: grid; gap: 10px; justify-items: start; }
+.empty p { margin: 0; max-width: 60ch; }
+.notice { border-radius: 10px; padding: 12px 14px; background: var(--warn-bg); color: var(--warn); font-size: 14px; }
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; gap: 2px; }
+.tile b { font-family: var(--f-num); font-size: 20px; font-weight: 500; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 12px; min-width: 0; }
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { font-weight: 500; color: var(--muted); font-size: 12px; }
+td.num { font-family: var(--f-num); }
+.insight { border-left: 3px solid var(--accent); padding: 4px 0 4px 12px; margin: 0; }
+
+.rules { display: grid; gap: 8px; }
+.rule-row { display: flex; gap: 8px; align-items: center; }
+.settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.field { display: grid; gap: 4px; min-width: 0; }
+.field > span { font-size: 13px; color: var(--muted); }
+.hint { font-size: 12px; color: var(--muted); }
+
+dialog { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--ink); padding: 0; width: min(600px, calc(100% - 32px)); max-height: calc(100% - 32px); }
+dialog::backdrop { background: rgba(10, 14, 12, 0.5); }
+.dlg { padding: 20px; display: grid; gap: 14px; }
+.dlg-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.checks { display: grid; gap: 6px; background: var(--sunken); border-radius: 10px; padding: 12px; }
+.checks label { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
+.checks input[type="checkbox"] { width: 18px; height: 18px; margin-top: 2px; flex: none; accent-color: var(--accent); }
+.live { display: grid; gap: 6px; }
+.live div { font-size: 14px; border-radius: 8px; padding: 8px 12px; }
+.live .info { background: var(--sunken); }
+.live .warn { background: var(--warn-bg); color: var(--warn); }
+.live .bad { background: var(--bad-bg); color: var(--bad); }
+.ack { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; color: var(--bad); }
+.ack input { width: 18px; height: 18px; margin-top: 2px; flex: none; accent-color: var(--bad); }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--paper); padding: 10px 16px; border-radius: 10px; font-size: 14px; z-index: 20; }
+@media (prefers-reduced-motion: no-preference) { .bar > i { transition: width 0.6s ease; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="label">감정이 아니라 계획으로</div>
+      <h1>나의 매매일지</h1>
+    </div>
+    <button class="primary" id="newBuyBtn" type="button">+ 매수 기록하기</button>
+  </header>
+
+  <section class="goal" aria-label="목표 진행">
+    <div class="goal-row">
+      <div><div class="label">현재 총자산</div><div class="goal-big" id="goalNow">–</div></div>
+      <div style="text-align:right"><div class="label">목표</div><div class="goal-big" id="goalTarget">100억</div></div>
+    </div>
+    <div class="bar" role="progressbar" aria-label="목표 달성률" id="goalBar"><i style="width:0%"></i></div>
+    <div class="ticks"><span id="goalPct">0%</span><span id="goalLeft">자산은 ‘내 원칙’ 탭에서 입력해요</span></div>
+  </section>
+
+  <div class="notice" id="storeNotice" hidden></div>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="open" aria-selected="true">보유 중<span class="count" id="cntOpen"></span></button>
+    <button role="tab" data-tab="closed" aria-selected="false">매매 기록<span class="count" id="cntClosed"></span></button>
+    <button role="tab" data-tab="stats" aria-selected="false">통계·복기</button>
+    <button role="tab" data-tab="rules" aria-selected="false">내 원칙</button>
+  </nav>
+
+  <main id="view"></main>
+</div>
+
+<dialog id="buyDlg">
+  <form class="dlg" id="buyForm" novalidate>
+    <div class="dlg-head"><h2>매수 기록</h2><button type="button" class="ghost" data-close>닫기</button></div>
+    <div class="grid2">
+      <label class="field"><span>종목명</span><input id="bName" required placeholder="예: 삼성전자"></label>
+      <label class="field"><span>매수일</span><input id="bDate" type="date" required></label>
+      <label class="field"><span>매수가 (원)</span><input id="bPrice" inputmode="decimal" required placeholder="72,000"></label>
+      <label class="field"><span>수량 (주)</span><input id="bQty" inputmode="decimal" required placeholder="10"></label>
+      <label class="field"><span>목표가 (원)</span><input id="bTarget" inputmode="decimal" placeholder="85,000"></label>
+      <label class="field"><span>손절가 (원)</span><input id="bStop" inputmode="decimal" placeholder="66,000"></label>
+    </div>
+    <label class="field"><span>왜 사나요? (필수 · 3문장 이내로)</span><textarea id="bReason" required placeholder="실적 개선 근거, 왜 지금인지, 어떤 일이 생기면 틀린 것인지"></textarea></label>
+    <div class="grid2">
+      <label class="field"><span>지금 내 기분</span>
+        <select id="bEmotion">
+          <option>차분함</option><option>확신</option><option>불안</option><option>흥분</option><option>남들 따라(FOMO)</option><option>손실 만회하고 싶음</option>
+        </select></label>
+      <label class="field"><span>예상 보유 기간</span>
+        <select id="bHorizon"><option>며칠</option><option>몇 주</option><option selected>몇 달</option><option>1년 이상</option></select></label>
+    </div>
+    <div class="checks" id="bChecks"><h3>매수 전 체크리스트</h3></div>
+    <div class="live" id="bLive"></div>
+    <label class="ack" id="bAckWrap" hidden><input type="checkbox" id="bAck"><span>원칙을 어긴다는 걸 알고 매수합니다. 이 매매는 ‘원칙 위반’으로 기록돼요.</span></label>
+    <div class="actions"><button type="submit" class="primary" id="bSave">기록 저장</button><span class="hint" id="bErr"></span></div>
+  </form>
+</dialog>
+
+<dialog id="sellDlg">
+  <form class="dlg" id="sellForm" novalidate>
+    <div class="dlg-head"><h2 id="sTitle">매도 기록</h2><button type="button" class="ghost" data-close>닫기</button></div>
+    <div class="reason" id="sPlan"></div>
+    <div class="grid2">
+      <label class="field"><span>매도일</span><input id="sDate" type="date" required></label>
+      <label class="field"><span>매도가 (원)</span><input id="sPrice" inputmode="decimal" required></label>
+    </div>
+    <label class="field"><span>왜 파나요?</span>
+      <select id="sReason">
+        <option value="target">목표가 도달 (계획대로)</option>
+        <option value="stop">손절가 도달 (계획대로)</option>
+        <option value="thesis">매수 이유가 깨짐 (계획대로)</option>
+        <option value="emotion">불안하거나 조급해서 (감정)</option>
+        <option value="cash">돈이 필요해서</option>
+        <option value="other">기타</option>
+      </select></label>
+    <div class="live" id="sLive"></div>
+    <label class="field"><span>복기 — 무엇을 배웠나요?</span><textarea id="sReview" placeholder="잘한 점, 아쉬운 점, 다음에 다르게 할 것"></textarea></label>
+    <div class="actions"><button type="submit" class="primary">매도 저장</button><span class="hint" id="sErr"></span></div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const DEFAULT_RULES = [
+  "손절가를 미리 정했다",
+  "이 종목을 사는 이유를 남에게 3문장으로 설명할 수 있다",
+  "빚(신용·미수·대출)으로 사지 않는다",
+  "최근 손실을 만회하려는 매수가 아니다",
+  "실적·재무를 직접 확인했다",
+];
+const DEFAULT_SETTINGS = { rules: DEFAULT_RULES, capital: 0, maxWeight: 20, maxLossPct: 2, goal: 10000000000, currentAssets: 0 };
+const EMOTION_RISKY = ["불안", "흥분", "남들 따라(FOMO)", "손실 만회하고 싶음"];
+const SELL_LABEL = { target: "목표가 도달", stop: "손절가 도달", thesis: "매수 이유 깨짐", emotion: "감정적 매도", cash: "자금 필요", other: "기타" };
+const PLANNED = ["target", "stop", "thesis"];
+
+const state = { trades: [], settings: { ...DEFAULT_SETTINGS }, tab: "open", store: "loading", sellId: null, confirmDel: null };
+let tradesCol = null, settingsRef = null;
+
+const $ = (id) => document.getElementById(id);
+function el(tag, attrs = {}, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v == null || v === false) continue;
+    if (k === "class") n.className = v; else if (k === "text") n.textContent = v; else n.setAttribute(k, v === true ? "" : v);
+  }
+  for (const c of kids.flat()) if (c != null && c !== false) n.append(c);
+  return n;
+}
+const parseNum = (v) => { const s = String(v ?? "").replace(/[^\d.\-]/g, ""); return s === "" ? null : Number(s); };
+const won = (n) => n == null || isNaN(n) ? "–" : Math.round(n).toLocaleString("ko-KR") + "원";
+function short(n) {
+  if (n == null || isNaN(n)) return "–";
+  const a = Math.abs(n), s = n < 0 ? "-" : "";
+  if (a >= 1e8) return s + (a / 1e8).toLocaleString("ko-KR", { maximumFractionDigits: 2 }) + "억";
+  if (a >= 1e4) return s + Math.round(a / 1e4).toLocaleString("ko-KR") + "만";
+  return s + Math.round(a).toLocaleString("ko-KR");
+}
+const pct = (n, d = 1) => n == null || !isFinite(n) ? "–" : (n > 0 ? "+" : "") + n.toFixed(d) + "%";
+const sign = (n) => n > 0 ? "up" : n < 0 ? "down" : "";
+const today = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, 2600); }
+
+/* ---------- 저장소 ---------- */
+async function init() {
+  render();
+  if (!window.claude?.use) return storeDown("저장 기능을 쓸 수 없는 화면이에요. claude.ai에서 로그인한 상태로 열어 주세요.");
+  const [db, user] = await Promise.all([claude.use("db"), claude.use("user")]);
+  const uid = user ? await user.id() : null;
+  if (!db || !uid) return storeDown("기록을 저장하려면 claude.ai에 로그인한 상태로 열어야 해요.");
+  const base = `data/users/${uid}`;
+  settingsRef = db.doc(`${base}/settings`);
+  tradesCol = db.doc(`${base}/journal`).collection("trades");
+  state.store = "ready";
+  settingsRef.onSnapshot((snap) => {
+    state.settings = { ...DEFAULT_SETTINGS, ...(snap.exists ? snap.data() : {}) };
+    render();
+  }, onDbError);
+  tradesCol.onSnapshot((snap) => {
+    state.trades = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    render();
+  }, onDbError);
+}
+function storeDown(msg) { state.store = "down"; const n = $("storeNotice"); n.textContent = msg; n.hidden = false; render(); }
+function onDbError(e) { storeDown(e.code === "revoked" ? "이 화면의 저장 권한이 끊겼어요. 새로고침해 주세요." : "기록을 불러오지 못했어요. 잠시 후 새로고침해 주세요."); }
+async function write(fn, okMsg) {
+  try { await fn(); if (okMsg) toast(okMsg); return true; }
+  catch (e) {
+    toast(e?.code === "quota_exceeded" ? "저장 공간이 가득 찼어요. 오래된 기록을 지워 주세요." : e?.code === "invalid_argument" ? "이 화면에서는 저장할 권한이 없어요." : "저장하지 못했어요. 다시 시도해 주세요.");
+    return false;
+  }
+}
+
+/* ---------- 계산 ---------- */
+const openTrades = () => state.trades.filter((t) => t.status === "open").sort((a, b) => (b.buyDate || "").localeCompare(a.buyDate || ""));
+const closedTrades = () => state.trades.filter((t) => t.status === "closed").sort((a, b) => (b.sellDate || "").localeCompare(a.sellDate || ""));
+const pnl = (t) => (t.sellPrice - t.buyPrice) * t.qty;
+const ret = (t) => (t.sellPrice / t.buyPrice - 1) * 100;
+
+function summarize(list) {
+  const n = list.length, wins = list.filter((t) => pnl(t) > 0), losses = list.filter((t) => pnl(t) < 0);
+  const avg = (a, f) => a.length ? a.reduce((s, t) => s + f(t), 0) / a.length : null;
+  return { n, winRate: n ? wins.length / n * 100 : null, total: list.reduce((s, t) => s + pnl(t), 0), avgRet: avg(list, ret), avgWin: avg(wins, ret), avgLoss: avg(losses, ret) };
+}
+
+function buyChecks() {
+  const s = state.settings, price = parseNum($("bPrice").value), qty = parseNum($("bQty").value);
+  const target = parseNum($("bTarget").value), stop = parseNum($("bStop").value);
+  const out = { violations: [], warnings: [], infos: [] };
+  $("bChecks").querySelectorAll("input[type=checkbox]").forEach((c) => { if (!c.checked) out.violations.push("체크 안 함: " + c.dataset.rule); });
+  if (!stop) out.violations.push("손절가가 비어 있어요");
+  if (price && qty) {
+    const amount = price * qty;
+    out.infos.push(`매수 금액 ${won(amount)}`);
+    if (s.capital > 0) {
+      const w = amount / s.capital * 100;
+      (w > s.maxWeight ? out.violations : out.infos).push(`투자 원금 대비 비중 ${w.toFixed(1)}% (한도 ${s.maxWeight}%)`);
+    }
+    if (stop) {
+      if (stop >= price) out.violations.push("손절가가 매수가보다 높거나 같아요");
+      else {
+        const loss = (price - stop) * qty;
+        const lossPct = s.capital > 0 ? loss / s.capital * 100 : null;
+        const msg = `손절 시 손실 ${won(loss)} (${pct(-(price - stop) / price * 100)})` + (lossPct != null ? `, 원금의 ${lossPct.toFixed(1)}%` : "");
+        (lossPct != null && lossPct > s.maxLossPct ? out.violations : out.infos).push(msg + (lossPct != null && lossPct > s.maxLossPct ? ` — 한 번에 잃어도 되는 한도 ${s.maxLossPct}% 초과` : ""));
+        if (target && target > price) {
+          const rr = (target - price) / (price - stop);
+          (rr < 2 ? out.warnings : out.infos).push(`손익비 ${rr.toFixed(1)} : 1` + (rr < 2 ? " — 2 : 1 이상을 권해요" : ""));
+        }
+      }
+    }
+  }
+  if (!target) out.warnings.push("목표가가 비어 있어요. 언제 팔지 미리 정해 두면 흔들림이 줄어요");
+  const emo = $("bEmotion").value;
+  if (EMOTION_RISKY.includes(emo)) out.warnings.push(`지금 기분이 ‘${emo}’이에요. 하루 뒤에 다시 봐도 살 건가요?`);
+  return out;
+}
+function renderBuyLive() {
+  const c = buyChecks(), live = $("bLive");
+  live.replaceChildren(
+    ...c.violations.map((m) => el("div", { class: "bad", text: "✕ " + m })),
+    ...c.warnings.map((m) => el("div", { class: "warn", text: "! " + m })),
+    ...c.infos.map((m) => el("div", { class: "info", text: m })),
+  );
+  $("bAckWrap").hidden = c.violations.length === 0;
+  if (!c.violations.length) $("bAck").checked = false;
+  return c;
+}
+
+/* ---------- 화면 ---------- */
+function render() {
+  const s = state.settings;
+  const now = s.currentAssets || 0, goal = s.goal || DEFAULT_SETTINGS.goal;
+  const p = Math.min(100, now / goal * 100);
+  $("goalNow").textContent = now ? short(now) + "원" : "미입력";
+  $("goalTarget").textContent = short(goal) + "원";
+  $("goalBar").firstElementChild.style.width = p + "%";
+  $("goalBar").setAttribute("aria-valuenow", p.toFixed(2));
+  $("goalPct").textContent = now ? p.toFixed(2) + "% 달성" : "0%";
+  $("goalLeft").textContent = now ? `남은 거리 ${short(goal - now)}원` : "자산은 ‘내 원칙’ 탭에서 입력해요";
+  $("cntOpen").textContent = openTrades().length || "";
+  $("cntClosed").textContent = closedTrades().length || "";
+  $("newBuyBtn").disabled = state.store !== "ready";
+  document.querySelectorAll("nav.tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === state.tab)));
+  const view = $("view");
+  const active = document.activeElement;
+  if (state.tab === "rules" && view.contains(active) && active.matches("input,textarea")) return; // 입력 중엔 다시 그리지 않음
+  view.replaceChildren(state.tab === "open" ? viewOpen() : state.tab === "closed" ? viewClosed() : state.tab === "stats" ? viewStats() : viewRules());
+}
+
+function emptyState(title, body, withBtn) {
+  return el("div", { class: "empty" }, el("h2", { text: title }), el("p", { class: "muted", text: body }),
+    withBtn && state.store === "ready" ? el("button", { class: "primary", type: "button", "data-act": "new" }, "+ 첫 매수 기록하기") : null);
+}
+
+function viewOpen() {
+  if (state.store === "loading") return emptyState("기록을 불러오는 중…", "잠시만 기다려 주세요.");
+  const list = openTrades();
+  if (!list.length) return emptyState("보유 중인 종목이 없어요",
+    "매수할 때 ‘왜 사는지, 얼마에 팔지, 어디서 손절할지’를 먼저 적어 두세요. 체크리스트가 원칙을 어기는 매수를 미리 알려 줘요.", true);
+  return el("div", { class: "list" }, list.map((t) => {
+    const amount = t.buyPrice * t.qty;
+    const cur = t.currentPrice;
+    const unreal = cur ? (cur - t.buyPrice) * t.qty : null;
+    const alerts = [];
+    if (cur && t.stop && cur <= t.stop) alerts.push(el("span", { class: "chip bad", text: "손절가 도달 — 계획대로 정리할 때예요" }));
+    if (cur && t.target && cur >= t.target) alerts.push(el("span", { class: "chip ok", text: "목표가 도달" }));
+    return el("article", { class: "trade" },
+      el("div", { class: "trade-head" },
+        el("div", {}, el("span", { class: "trade-name", text: t.name }), " ", el("span", { class: "muted", text: `${t.buyDate} · ${t.horizon || ""}` })),
+        unreal != null ? el("span", { class: "num " + sign(unreal), text: `${pct((cur / t.buyPrice - 1) * 100)} (${short(unreal)}원)` }) : null),
+      el("div", { class: "kv" },
+        kv("매수가", won(t.buyPrice)), kv("수량", t.qty.toLocaleString("ko-KR") + "주"), kv("매수 금액", won(amount)),
+        kv("목표가", t.target ? won(t.target) : "–", "up"), kv("손절가", t.stop ? won(t.stop) : "–", "down")),
+      el("div", { class: "reason", text: t.reason }),
+      tradeChips(t, alerts),
+      el("div", { class: "actions" },
+        el("label", { class: "inline-price" }, el("span", { class: "label", text: "현재가" }),
+          el("input", { inputmode: "decimal", "data-cur": t.id, id: "cur-" + t.id, value: cur ? cur.toLocaleString("ko-KR") : "", placeholder: "입력하면 손익 계산" })),
+        el("button", { class: "primary", type: "button", "data-act": "sell", "data-id": t.id }, "매도 기록"),
+        delBtn(t.id)));
+  }));
+}
+const kv = (k, v, cls) => el("div", {}, el("span", { class: "label", text: k }), el("b", { class: cls || "", text: v }));
+function tradeChips(t, extra = []) {
+  const chips = [el("span", { class: "chip", text: "기분: " + (t.emotion || "–") })];
+  if (t.violations?.length) chips.push(el("span", { class: "chip bad", text: `원칙 위반 ${t.violations.length}건`, title: t.violations.join("\n") }));
+  else chips.push(el("span", { class: "chip ok", text: "원칙 준수 매수" }));
+  return el("div", { class: "chips" }, chips, extra);
+}
+function delBtn(id) {
+  return state.confirmDel === id
+    ? el("span", { class: "actions" }, el("span", { class: "hint", text: "정말 지울까요?" }),
+        el("button", { class: "danger", type: "button", "data-act": "del-yes", "data-id": id }, "삭제"),
+        el("button", { class: "ghost", type: "button", "data-act": "del-no" }, "취소"))
+    : el("button", { class: "ghost", type: "button", "data-act": "del", "data-id": id }, "삭제");
+}
+
+function viewClosed() {
+  const list = closedTrades();
+  if (!list.length) return emptyState("아직 끝난 매매가 없어요", "매도까지 기록하면 수익률과 함께 ‘계획대로 팔았는지’가 여기에 쌓여요.");
+  return el("div", { class: "list" }, list.map((t) => {
+    const r = ret(t), p = pnl(t);
+    const chips = [el("span", { class: "chip " + (PLANNED.includes(t.sellReason) ? "ok" : "warn"), text: SELL_LABEL[t.sellReason] || "기타" })];
+    if (t.stop && t.sellPrice < t.stop) chips.push(el("span", { class: "chip bad", text: "손절가보다 늦게 팔았음" }));
+    return el("article", { class: "trade" },
+      el("div", { class: "trade-head" },
+        el("div", {}, el("span", { class: "trade-name", text: t.name }), " ", el("span", { class: "muted", text: `${t.buyDate} → ${t.sellDate}` })),
+        el("span", { class: "num " + sign(p), text: `${pct(r)} (${short(p)}원)` })),
+      el("div", { class: "kv" }, kv("매수가", won(t.buyPrice)), kv("매도가", won(t.sellPrice)), kv("수량", t.qty.toLocaleString("ko-KR") + "주"),
+        kv("목표가", t.target ? won(t.target) : "–", "up"), kv("손절가", t.stop ? won(t.stop) : "–", "down")),
+      el("div", { class: "reason", text: "산 이유: " + t.reason }),
+      t.review ? el("div", { class: "reason", text: "복기: " + t.review }) : null,
+      tradeChips(t, chips),
+      el("div", { class: "actions" }, delBtn(t.id)));
+  }));
+}
+
+function viewStats() {
+  const list = closedTrades();
+  if (list.length === 0) return emptyState("매도 기록이 쌓이면 통계가 보여요",
+    "승률, 평균 수익과 손실, 그리고 ‘원칙을 지킨 매매’와 ‘어긴 매매’의 성과 차이를 비교해 드려요.");
+  const all = summarize(list);
+  const kept = summarize(list.filter((t) => !t.violations?.length)), broke = summarize(list.filter((t) => t.violations?.length));
+  const planned = list.filter((t) => PLANNED.includes(t.sellReason)).length;
+  const late = list.filter((t) => t.stop && t.sellPrice < t.stop).length;
+  const payoff = all.avgWin != null && all.avgLoss ? Math.abs(all.avgWin / all.avgLoss) : null;
+  const tiles = el("div", { class: "tiles" },
+    tile("실현 손익", short(all.total) + "원", sign(all.total)), tile("승률", all.winRate.toFixed(0) + "%", "", `${all.n}번 중`),
+    tile("평균 수익 / 손실", `${pct(all.avgWin)} / ${pct(all.avgLoss)}`), tile("손익비", payoff ? payoff.toFixed(2) + " : 1" : "–"),
+    tile("계획대로 매도", (planned / list.length * 100).toFixed(0) + "%"), tile("늦은 손절", late + "번", late ? "down" : ""));
+
+  const insights = [];
+  if (kept.n && broke.n) {
+    const diff = kept.avgRet - broke.avgRet;
+    insights.push(diff >= 0
+      ? `원칙을 지킨 매매의 평균 수익률이 어긴 매매보다 ${diff.toFixed(1)}%p 높아요. 원칙이 실제로 돈을 지켜 주고 있어요.`
+      : `이번에는 원칙을 어긴 매매가 평균 ${(-diff).toFixed(1)}%p 더 좋았어요. 표본이 적을 때는 운일 수 있으니 기록을 더 쌓아 보세요.`);
+  }
+  if (late) insights.push(`손절가 아래에서 판 매매가 ${late}번 있어요. 손절가에 미리 주문을 걸어 두는 것도 방법이에요.`);
+  if (payoff && payoff < 1.5) insights.push("평균 수익이 평균 손실에 비해 작아요. 수익은 더 길게, 손실은 더 짧게 가져가는 연습이 필요해요.");
+
+  const cmp = el("div", { class: "panel" }, el("h2", { text: "원칙을 지켰을 때 vs 어겼을 때" }),
+    el("div", { class: "table-wrap" }, el("table", {},
+      el("thead", {}, el("tr", {}, ["", "매매 수", "승률", "평균 수익률", "실현 손익"].map((h) => el("th", { text: h })))),
+      el("tbody", {}, statRow("원칙 준수", kept), statRow("원칙 위반", broke)))),
+    insights.map((m) => el("p", { class: "insight", text: m })));
+
+  const emos = [...new Set(list.map((t) => t.emotion || "–"))];
+  const emo = el("div", { class: "panel" }, el("h2", { text: "매수할 때 기분별 성과" }),
+    el("div", { class: "table-wrap" }, el("table", {},
+      el("thead", {}, el("tr", {}, ["기분", "매매 수", "승률", "평균 수익률", "실현 손익"].map((h) => el("th", { text: h })))),
+      el("tbody", {}, emos.map((e) => statRow(e, summarize(list.filter((t) => (t.emotion || "–") === e))))))));
+  return el("div", { class: "list" }, tiles, cmp, emo);
+}
+const tile = (k, v, cls = "", sub) => el("div", { class: "tile" }, el("span", { class: "label", text: k }), el("b", { class: cls, text: v }), sub ? el("span", { class: "hint", text: sub }) : null);
+const statRow = (name, s) => el("tr", {}, el("td", { text: name }), el("td", { class: "num", text: String(s.n) }),
+  el("td", { class: "num", text: s.n ? s.winRate.toFixed(0) + "%" : "–" }), el("td", { class: "num " + sign(s.avgRet), text: pct(s.avgRet) }),
+  el("td", { class: "num " + sign(s.total), text: s.n ? short(s.total) + "원" : "–" }));
+
+function viewRules() {
+  const s = state.settings;
+  const rules = el("div", { class: "rules", id: "ruleList" }, s.rules.map((r, i) => ruleRow(r, i)));
+  const field = (id, label, val, hint) => el("label", { class: "field" }, el("span", { text: label }),
+    el("input", { id, inputmode: "decimal", value: val ? Number(val).toLocaleString("ko-KR") : "" }), hint ? el("span", { class: "hint", text: hint }) : null);
+  return el("div", { class: "list" },
+    el("div", { class: "panel" }, el("h2", { text: "매수 전에 꼭 확인할 내 원칙" }),
+      el("p", { class: "hint", text: "매수 기록을 쓸 때마다 이 목록이 체크리스트로 나와요. 지난 실패에서 배운 것을 한 줄씩 적어 두세요." }),
+      rules, el("div", {}, el("button", { type: "button", "data-act": "rule-add" }, "+ 원칙 추가"))),
+    el("div", { class: "panel" }, el("h2", { text: "돈 관리 기준" }),
+      el("div", { class: "settings-grid" },
+        field("setCapital", "투자 원금 (원)", s.capital, "비중과 손실 한도를 계산하는 기준"),
+        field("setMaxWeight", "한 종목 최대 비중 (%)", s.maxWeight),
+        field("setMaxLoss", "한 번에 잃어도 되는 한도 (원금의 %)", s.maxLossPct, "보통 1~2%를 권해요"),
+        field("setAssets", "현재 총자산 (원)", s.currentAssets, "목표 진행 막대에 쓰여요"),
+        field("setGoal", "목표 자산 (원)", s.goal))),
+    el("div", { class: "actions" }, el("button", { class: "primary", type: "button", "data-act": "save-settings", disabled: state.store !== "ready" }, "원칙과 기준 저장")));
+}
+const ruleRow = (r, i) => el("div", { class: "rule-row" }, el("input", { id: "rule-" + i, "data-rule-input": "", value: r, "aria-label": `원칙 ${i + 1}` }),
+  el("button", { class: "ghost", type: "button", "data-act": "rule-del", "aria-label": "이 원칙 지우기" }, "지우기"));
+
+/* ---------- 동작 ---------- */
+function openBuy() {
+  const f = $("buyForm"); f.reset(); $("bDate").value = today(); $("bErr").textContent = "";
+  const box = $("bChecks"); box.replaceChildren(el("h3", { text: "매수 전 체크리스트" }));
+  state.settings.rules.forEach((r, i) => box.append(el("label", {}, el("input", { type: "checkbox", id: "chk-" + i, "data-rule": r }), el("span", { text: r }))));
+  renderBuyLive(); $("buyDlg").showModal();
+}
+$("buyForm").addEventListener("input", renderBuyLive);
+$("buyForm").addEventListener("change", renderBuyLive);
+$("buyForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const name = $("bName").value.trim(), price = parseNum($("bPrice").value), qty = parseNum($("bQty").value), reason = $("bReason").value.trim();
+  if (!name || !price || !qty || !reason || !$("bDate").value) { $("bErr").textContent = "종목명, 매수일, 매수가, 수량, 매수 이유는 꼭 적어 주세요."; return; }
+  const c = renderBuyLive();
+  if (c.violations.length && !$("bAck").checked) { $("bErr").textContent = "원칙 위반 항목이 있어요. 그래도 산다면 아래 확인란에 체크해 주세요."; return; }
+  const checks = {}; $("bChecks").querySelectorAll("input[type=checkbox]").forEach((x) => checks[x.dataset.rule] = x.checked);
+  const ok = await write(() => tradesCol.add({
+    name, buyDate: $("bDate").value, buyPrice: price, qty, target: parseNum($("bTarget").value), stop: parseNum($("bStop").value),
+    reason, emotion: $("bEmotion").value, horizon: $("bHorizon").value, checks, violations: c.violations, warnings: c.warnings,
+    status: "open", createdAt: new Date().toISOString(),
+  }), "매수 기록을 저장했어요");
+  if (ok) { $("buyDlg").close(); state.tab = "open"; render(); }
+});
+
+function openSell(id) {
+  const t = state.trades.find((x) => x.id === id); if (!t) return;
+  state.sellId = id; $("sellForm").reset(); $("sDate").value = today(); $("sErr").textContent = "";
+  $("sTitle").textContent = `${t.name} 매도 기록`;
+  $("sPlan").textContent = `처음 계획 — 목표가 ${t.target ? won(t.target) : "없음"}, 손절가 ${t.stop ? won(t.stop) : "없음"}\n산 이유: ${t.reason}`;
+  if (t.currentPrice) $("sPrice").value = t.currentPrice.toLocaleString("ko-KR");
+  renderSellLive(); $("sellDlg").showModal();
+}
+function renderSellLive() {
+  const t = state.trades.find((x) => x.id === state.sellId), price = parseNum($("sPrice").value), live = $("sLive");
+  if (!t || !price) return live.replaceChildren();
+  const p = (price - t.buyPrice) * t.qty, out = [el("div", { class: "info" }, "예상 결과 ", el("span", { class: "num " + sign(p), text: `${pct((price / t.buyPrice - 1) * 100)} (${won(p)})` }))];
+  const why = $("sReason").value;
+  if (why === "emotion") out.push(el("div", { class: "warn", text: "! 감정적 매도로 기록돼요. 처음 계획에서 무엇이 달라졌는지 복기에 꼭 적어 두세요." }));
+  if (t.stop && price < t.stop) out.push(el("div", { class: "bad", text: `✕ 손절가(${won(t.stop)})보다 낮은 가격이에요. 늦은 손절로 기록돼요.` }));
+  live.replaceChildren(...out);
+}
+$("sellForm").addEventListener("input", renderSellLive);
+$("sellForm").addEventListener("change", renderSellLive);
+$("sellForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const price = parseNum($("sPrice").value);
+  if (!price || !$("sDate").value) { $("sErr").textContent = "매도일과 매도가를 적어 주세요."; return; }
+  const ok = await write(() => tradesCol.doc(state.sellId).update({
+    status: "closed", sellDate: $("sDate").value, sellPrice: price, sellReason: $("sReason").value, review: $("sReview").value.trim(),
+  }), "매도 기록을 저장했어요");
+  if (ok) { $("sellDlg").close(); state.tab = "closed"; render(); }
+});
+
+document.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", () => b.closest("dialog").close()));
+$("newBuyBtn").addEventListener("click", openBuy);
+document.querySelector("nav.tabs").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-tab]"); if (!b) return;
+  state.tab = b.dataset.tab; state.confirmDel = null; render();
+  try { localStorage.setItem("journal-tab", state.tab); } catch {}
+});
+$("view").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  const act = b.dataset.act, id = b.dataset.id;
+  if (act === "new") openBuy();
+  else if (act === "sell") openSell(id);
+  else if (act === "del") { state.confirmDel = id; render(); }
+  else if (act === "del-no") { state.confirmDel = null; render(); }
+  else if (act === "del-yes") { state.confirmDel = null; await write(() => tradesCol.doc(id).delete(), "기록을 지웠어요"); }
+  else if (act === "rule-add") { const list = $("ruleList"), row = ruleRow("", list.children.length); list.append(row); row.querySelector("input").focus(); }
+  else if (act === "rule-del") b.closest(".rule-row").remove();
+  else if (act === "save-settings") {
+    const rules = [...document.querySelectorAll("[data-rule-input]")].map((i) => i.value.trim()).filter(Boolean);
+    const num = (id, d) => parseNum($(id).value) ?? d;
+    const next = { rules, capital: num("setCapital", 0), maxWeight: num("setMaxWeight", 20), maxLossPct: num("setMaxLoss", 2), currentAssets: num("setAssets", 0), goal: num("setGoal", DEFAULT_SETTINGS.goal) || DEFAULT_SETTINGS.goal };
+    b.blur();
+    await write(() => settingsRef.set(next), "원칙과 기준을 저장했어요");
+  }
+});
+$("view").addEventListener("change", async (e) => {
+  const inp = e.target.closest("[data-cur]"); if (!inp) return;
+  const v = parseNum(inp.value), t = state.trades.find((x) => x.id === inp.dataset.cur);
+  if (!t || (v ?? null) === (t.currentPrice ?? null)) return;
+  inp.blur();
+  await write(() => tradesCol.doc(t.id).update({ currentPrice: v }));
+});
+
+try { const saved = localStorage.getItem("journal-tab"); if (["open", "closed", "stats", "rules"].includes(saved)) state.tab = saved; } catch {}
+init();
+</script>
