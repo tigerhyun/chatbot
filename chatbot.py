@@ -1,54 +1,69 @@
-"""터미널에서 대화하는 간단한 규칙 기반 챗봇."""
+"""터미널에서 Claude와 대화하는 챗봇."""
 
-import random
-from datetime import datetime
+import anthropic
 
+MODEL = "claude-opus-5-5"
+SYSTEM_PROMPT = "당신은 친절한 대화 상대입니다. 사용자가 쓰는 언어로 짧고 자연스럽게 답하세요."
 EXIT_WORDS = {"종료", "끝", "quit", "exit", "bye"}
 
-# (키워드 목록, 가능한 답변 목록)
-RULES = [
-    (["안녕", "hello", "hi", "하이"], ["안녕하세요! 반가워요 😊", "안녕! 오늘 기분은 어때요?"]),
-    (["이름", "누구"], ["저는 파이썬으로 만든 간단한 챗봇이에요."]),
-    (["기분", "어때"], ["저는 언제나 좋아요! 당신은요?"]),
-    (["고마", "감사", "thank"], ["천만에요!", "도움이 됐다니 기뻐요."]),
-    (["심심", "놀자"], ["저랑 이야기해요! 좋아하는 게 뭐예요?"]),
-    (["좋아", "행복"], ["와, 좋네요! 😄"]),
-    (["슬퍼", "우울", "힘들"], ["많이 힘드셨겠어요. 이야기 들어줄게요."]),
-]
 
-FALLBACKS = [
-    "흥미롭네요! 조금 더 이야기해 줄래요?",
-    "음, 잘 이해하지 못했어요. 다르게 말해 줄래요?",
-    "그렇군요. 그래서요?",
-]
+def ask_claude(client: anthropic.Anthropic, messages: list) -> None:
+    """대화 기록을 보내고 답변을 실시간으로 출력한 뒤 기록에 추가한다."""
+    print("🤖 Claude: ", end="", flush=True)
+    with client.beta.messages.stream(
+        model=MODEL,
+        max_tokens=64000,
+        system=SYSTEM_PROMPT,
+        messages=messages,
+        output_config={"effort": "low"},
+        # 안전 필터가 답변을 거절하면 서버가 추천 모델로 자동 재시도한다.
+        betas=["server-side-fallback-2026-07-01"],
+        fallbacks="default",
+    ) as stream:
+        for text in stream.text_stream:
+            print(text, end="", flush=True)
+        response = stream.get_final_message()
+    print()
 
-
-def get_response(message: str) -> str:
-    text = message.strip().lower()
-    if not text:
-        return "무슨 말이든 해 주세요!"
-    if "시간" in text or "몇 시" in text:
-        return f"지금은 {datetime.now():%H시 %M분}이에요."
-    if "날짜" in text or "오늘" in text:
-        return f"오늘은 {datetime.now():%Y년 %m월 %d일}이에요."
-    for keywords, answers in RULES:
-        if any(keyword in text for keyword in keywords):
-            return random.choice(answers)
-    return random.choice(FALLBACKS)
+    if response.stop_reason == "refusal":
+        print("(이 질문에는 답할 수 없어요. 다르게 물어봐 주세요.)")
+        messages.pop()  # 거절된 질문은 기록에서 뺀다
+        return
+    # 텍스트만이 아니라 content 전체를 그대로 기록에 남겨야 다음 요청이 올바르다.
+    messages.append({"role": "assistant", "content": response.content})
 
 
 def main() -> None:
-    print("🤖 챗봇: 안녕하세요! 대화를 끝내려면 '종료'라고 입력하세요.")
+    client = anthropic.Anthropic()  # ANTHROPIC_API_KEY 환경 변수를 사용
+    messages = []
+    print("🤖 Claude: 안녕하세요! 대화를 끝내려면 '종료'라고 입력하세요.")
     while True:
         try:
-            message = input("나: ")
+            user_input = input("나: ").strip()
         except (EOFError, KeyboardInterrupt):
             print()
             break
-        if message.strip().lower() in EXIT_WORDS:
+        if not user_input:
+            continue
+        if user_input.lower() in EXIT_WORDS:
             break
-        print(f"🤖 챗봇: {get_response(message)}")
-    print("🤖 챗봇: 안녕히 가세요! 👋")
+
+        messages.append({"role": "user", "content": user_input})
+        try:
+            ask_claude(client, messages)
+        except anthropic.AuthenticationError:
+            print("\n❌ API 키가 올바르지 않아요. ANTHROPIC_API_KEY를 확인해 주세요.")
+            return
+        except anthropic.RateLimitError:
+            print("\n⏳ 요청이 너무 많아요. 잠시 후 다시 시도해 주세요.")
+            messages.pop()
+        except anthropic.APIConnectionError:
+            print("\n🌐 네트워크 연결을 확인해 주세요.")
+            messages.pop()
+        except anthropic.APIStatusError as e:
+            print(f"\n⚠️ API 오류 ({e.status_code}): {e.message}")
+            messages.pop()
+    print("🤖 Claude: 안녕히 가세요! 👋")
 
 
 if __name__ == "__main__":
