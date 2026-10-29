@@ -145,7 +145,7 @@ dialog::backdrop { background: rgba(10, 14, 12, 0.5); }
 
 <dialog id="buyDlg">
   <form class="dlg" id="buyForm" novalidate>
-    <div class="dlg-head"><h2>매수 기록</h2><button type="button" class="ghost" data-close>닫기</button></div>
+    <div class="dlg-head"><h2 id="bTitle">매수 기록</h2><button type="button" class="ghost" data-close>닫기</button></div>
     <div class="grid2">
       <label class="field"><span>종목명</span><input id="bName" required placeholder="예: 삼성전자"></label>
       <label class="field"><span>매수일</span><input id="bDate" type="date" required></label>
@@ -208,7 +208,7 @@ const EMOTION_RISKY = ["불안", "흥분", "남들 따라(FOMO)", "손실 만회
 const SELL_LABEL = { target: "목표가 도달", stop: "손절가 도달", thesis: "매수 이유 깨짐", emotion: "감정적 매도", cash: "자금 필요", other: "기타" };
 const PLANNED = ["target", "stop", "thesis"];
 
-const state = { trades: [], settings: { ...DEFAULT_SETTINGS }, tab: "open", store: "loading", sellId: null, confirmDel: null };
+const state = { trades: [], settings: { ...DEFAULT_SETTINGS }, tab: "open", store: "loading", sellId: null, editId: null, confirmDel: null };
 let tradesCol = null, settingsRef = null;
 
 const $ = (id) => document.getElementById(id);
@@ -306,7 +306,12 @@ function buyChecks() {
   }
   if (!target) out.warnings.push("목표가가 비어 있어요. 언제 팔지 미리 정해 두면 흔들림이 줄어요");
   const emo = $("bEmotion").value;
-  if (EMOTION_RISKY.includes(emo)) out.warnings.push(`지금 기분이 ‘${emo}’이에요. 하루 뒤에 다시 봐도 살 건가요?`);
+  if (!state.editId && EMOTION_RISKY.includes(emo)) out.warnings.push(`지금 기분이 ‘${emo}’이에요. 하루 뒤에 다시 봐도 살 건가요?`);
+  const t = state.editId && state.trades.find((x) => x.id === state.editId);
+  if (t) {
+    const firstStop = (t.originalPlan || t).stop;
+    if (firstStop && (!stop || stop < firstStop)) out.warnings.unshift(`손절가를 처음 계획(${won(firstStop)})보다 낮추고 있어요. 손실을 키우는 가장 흔한 실수예요. 정말 이유가 있다면 매수 이유란에 함께 적어 두세요.`);
+  }
   return out;
 }
 function renderBuyLive() {
@@ -316,7 +321,7 @@ function renderBuyLive() {
     ...c.warnings.map((m) => el("div", { class: "warn", text: "! " + m })),
     ...c.infos.map((m) => el("div", { class: "info", text: m })),
   );
-  $("bAckWrap").hidden = c.violations.length === 0;
+  $("bAckWrap").hidden = !!state.editId || c.violations.length === 0;
   if (!c.violations.length) $("bAck").checked = false;
   return c;
 }
@@ -367,11 +372,13 @@ function viewOpen() {
         kv("매수가", won(t.buyPrice)), kv("수량", t.qty.toLocaleString("ko-KR") + "주"), kv("매수 금액", won(amount)),
         kv("목표가", t.target ? won(t.target) : "–", "up"), kv("손절가", t.stop ? won(t.stop) : "–", "down")),
       el("div", { class: "reason", text: t.reason }),
+      t.originalPlan ? el("div", { class: "hint", text: `처음 계획 — 목표가 ${t.originalPlan.target ? won(t.originalPlan.target) : "없음"}, 손절가 ${t.originalPlan.stop ? won(t.originalPlan.stop) : "없음"}` }) : null,
       tradeChips(t, alerts),
       el("div", { class: "actions" },
         el("label", { class: "inline-price" }, el("span", { class: "label", text: "현재가" }),
           el("input", { inputmode: "decimal", "data-cur": t.id, id: "cur-" + t.id, value: cur ? cur.toLocaleString("ko-KR") : "", placeholder: "입력하면 손익 계산" })),
         el("button", { class: "primary", type: "button", "data-act": "sell", "data-id": t.id }, "매도 기록"),
+        el("button", { type: "button", "data-act": "edit", "data-id": t.id }, "수정"),
         delBtn(t.id)));
   }));
 }
@@ -380,6 +387,9 @@ function tradeChips(t, extra = []) {
   const chips = [el("span", { class: "chip", text: "기분: " + (t.emotion || "–") })];
   if (t.violations?.length) chips.push(el("span", { class: "chip bad", text: `원칙 위반 ${t.violations.length}건`, title: t.violations.join("\n") }));
   else chips.push(el("span", { class: "chip ok", text: "원칙 준수 매수" }));
+  if (t.edits?.length) chips.push(el("span", { class: "chip", text: `수정 ${t.edits.length}회`, title: t.edits.map((e) => e.at.slice(0, 10) + " " + e.summary).join("\n") }));
+  const firstStop = t.originalPlan?.stop;
+  if (firstStop && (!t.stop || t.stop < firstStop)) chips.push(el("span", { class: "chip bad", text: "손절가를 처음보다 낮춤" }));
   return el("div", { class: "chips" }, chips, extra);
 }
 function delBtn(id) {
@@ -474,10 +484,24 @@ const ruleRow = (r, i) => el("div", { class: "rule-row" }, el("input", { id: "ru
   el("button", { class: "ghost", type: "button", "data-act": "rule-del", "aria-label": "이 원칙 지우기" }, "지우기"));
 
 /* ---------- 동작 ---------- */
-function openBuy() {
-  const f = $("buyForm"); f.reset(); $("bDate").value = today(); $("bErr").textContent = "";
+const EDIT_FIELDS = { name: "종목명", buyDate: "매수일", buyPrice: "매수가", qty: "수량", target: "목표가", stop: "손절가", reason: "매수 이유", emotion: "기분", horizon: "보유 기간" };
+function openBuy(id) {
+  const t = id ? state.trades.find((x) => x.id === id) : null;
+  state.editId = t ? t.id : null;
+  const f = $("buyForm"); f.reset(); $("bErr").textContent = "";
+  $("bTitle").textContent = t ? `${t.name} 수정` : "매수 기록";
+  $("bSave").textContent = t ? "수정 저장" : "기록 저장";
   const box = $("bChecks"); box.replaceChildren(el("h3", { text: "매수 전 체크리스트" }));
-  state.settings.rules.forEach((r, i) => box.append(el("label", {}, el("input", { type: "checkbox", id: "chk-" + i, "data-rule": r }), el("span", { text: r }))));
+  box.hidden = !!t; // 체크리스트는 매수 시점의 기록이라 수정하지 않음
+  if (t) {
+    const fmt = (n) => n == null ? "" : Number(n).toLocaleString("ko-KR");
+    $("bName").value = t.name; $("bDate").value = t.buyDate; $("bPrice").value = fmt(t.buyPrice); $("bQty").value = fmt(t.qty);
+    $("bTarget").value = fmt(t.target); $("bStop").value = fmt(t.stop); $("bReason").value = t.reason;
+    $("bEmotion").value = t.emotion || "차분함"; $("bHorizon").value = t.horizon || "몇 달";
+  } else {
+    $("bDate").value = today();
+    state.settings.rules.forEach((r, i) => box.append(el("label", {}, el("input", { type: "checkbox", id: "chk-" + i, "data-rule": r }), el("span", { text: r }))));
+  }
   renderBuyLive(); $("buyDlg").showModal();
 }
 $("buyForm").addEventListener("input", renderBuyLive);
@@ -487,6 +511,7 @@ $("buyForm").addEventListener("submit", async (e) => {
   const name = $("bName").value.trim(), price = parseNum($("bPrice").value), qty = parseNum($("bQty").value), reason = $("bReason").value.trim();
   if (!name || !price || !qty || !reason || !$("bDate").value) { $("bErr").textContent = "종목명, 매수일, 매수가, 수량, 매수 이유는 꼭 적어 주세요."; return; }
   const c = renderBuyLive();
+  if (state.editId) return saveEdit({ name, buyDate: $("bDate").value, buyPrice: price, qty, target: parseNum($("bTarget").value), stop: parseNum($("bStop").value), reason, emotion: $("bEmotion").value, horizon: $("bHorizon").value });
   if (c.violations.length && !$("bAck").checked) { $("bErr").textContent = "원칙 위반 항목이 있어요. 그래도 산다면 아래 확인란에 체크해 주세요."; return; }
   const checks = {}; $("bChecks").querySelectorAll("input[type=checkbox]").forEach((x) => checks[x.dataset.rule] = x.checked);
   const ok = await write(() => tradesCol.add({
@@ -496,6 +521,18 @@ $("buyForm").addEventListener("submit", async (e) => {
   }), "매수 기록을 저장했어요");
   if (ok) { $("buyDlg").close(); state.tab = "open"; render(); }
 });
+
+async function saveEdit(next) {
+  const t = state.trades.find((x) => x.id === state.editId); if (!t) return;
+  const changed = Object.keys(EDIT_FIELDS).filter((k) => (next[k] ?? null) !== (t[k] ?? null));
+  if (!changed.length) { $("buyDlg").close(); return; }
+  const show = (k, v) => v == null || v === "" ? "없음" : ["buyPrice", "target", "stop"].includes(k) ? won(v) : k === "reason" ? "(내용 변경)" : String(v);
+  const summary = changed.map((k) => `${EDIT_FIELDS[k]} ${show(k, t[k])} → ${show(k, next[k])}`).join(", ");
+  const patch = { ...next, edits: [...(t.edits || []), { at: new Date().toISOString(), summary }] };
+  if (!t.originalPlan) patch.originalPlan = { target: t.target ?? null, stop: t.stop ?? null, buyPrice: t.buyPrice, qty: t.qty };
+  const ok = await write(() => tradesCol.doc(t.id).update(patch), "수정했어요");
+  if (ok) { $("buyDlg").close(); state.editId = null; }
+}
 
 function openSell(id) {
   const t = state.trades.find((x) => x.id === id); if (!t) return;
@@ -527,7 +564,8 @@ $("sellForm").addEventListener("submit", async (e) => {
 });
 
 document.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", () => b.closest("dialog").close()));
-$("newBuyBtn").addEventListener("click", openBuy);
+$("newBuyBtn").addEventListener("click", () => openBuy());
+$("buyDlg").addEventListener("close", () => { state.editId = null; });
 document.querySelector("nav.tabs").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-tab]"); if (!b) return;
   state.tab = b.dataset.tab; state.confirmDel = null; render();
@@ -538,6 +576,7 @@ $("view").addEventListener("click", async (e) => {
   const act = b.dataset.act, id = b.dataset.id;
   if (act === "new") openBuy();
   else if (act === "sell") openSell(id);
+  else if (act === "edit") openBuy(id);
   else if (act === "del") { state.confirmDel = id; render(); }
   else if (act === "del-no") { state.confirmDel = null; render(); }
   else if (act === "del-yes") { state.confirmDel = null; await write(() => tradesCol.doc(id).delete(), "기록을 지웠어요"); }
