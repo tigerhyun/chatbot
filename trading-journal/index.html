@@ -7,6 +7,7 @@
 :root {
   --paper: #f3f5f2; --surface: #ffffff; --sunken: #e9ede8; --ink: #17201c; --muted: #5b6862; --line: #d9dfd8;
   --accent: #2b5a4b; --accent-ink: #ffffff; --accent-soft: #dfeae5;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a;
   --up: #d1323c; --down: #2a5fc4; --warn: #9a6512; --warn-bg: #fbf2df; --bad: #b4232c; --bad-bg: #fbe5e6;
   --f-display: "Nanum Myeongjo", "Batang", serif;
   --f-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
@@ -15,11 +16,13 @@
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --paper: #101513; --surface: #171e1b; --sunken: #0c100e; --ink: #e4ebe7; --muted: #94a29b; --line: #29322e;
   --accent: #82c2ac; --accent-ink: #0d1814; --accent-soft: #1d2d27;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70;
   --up: #ff6e76; --down: #72a0ff; --warn: #e3b45e; --warn-bg: #2a2315; --bad: #ff7d84; --bad-bg: #2e1718; color-scheme: dark;
 } }
 :root[data-theme="dark"] {
   --paper: #101513; --surface: #171e1b; --sunken: #0c100e; --ink: #e4ebe7; --muted: #94a29b; --line: #29322e;
   --accent: #82c2ac; --accent-ink: #0d1814; --accent-soft: #1d2d27;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70;
   --up: #ff6e76; --down: #72a0ff; --warn: #e3b45e; --warn-bg: #2a2315; --bad: #ff7d84; --bad-bg: #2e1718; color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -90,7 +93,7 @@ td.num { font-family: var(--f-num); }
 .rules { display: grid; gap: 8px; }
 .rule-row { display: flex; gap: 8px; align-items: center; }
 .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
-.field { display: grid; gap: 4px; min-width: 0; }
+.field { display: grid; gap: 4px; min-width: 0; align-content: start; }
 .field > span { font-size: 13px; color: var(--muted); }
 .hint { font-size: 12px; color: var(--muted); }
 
@@ -110,6 +113,30 @@ dialog::backdrop { background: rgba(10, 14, 12, 0.5); }
 .ack { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; color: var(--bad); }
 .ack input { width: 18px; height: 18px; margin-top: 2px; flex: none; accent-color: var(--bad); }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--paper); padding: 10px 16px; border-radius: 10px; font-size: 14px; z-index: 20; }
+.chart { display: grid; gap: 8px; min-width: 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { display: inline-block; width: 16px; height: 2px; border-radius: 1px; }
+.legend i.dash { background: none !important; border-top: 2px dashed var(--muted); height: 0; }
+.plot { position: relative; min-width: 0; }
+.plot svg { display: block; overflow: visible; }
+.plot svg:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
+.plot .grid { stroke: var(--line); stroke-width: 1; }
+.plot .axis { stroke: var(--muted); stroke-width: 1; opacity: 0.6; }
+.plot .goal-line { stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.plot .cross { stroke: var(--muted); stroke-width: 1; }
+.plot .ring { stroke: var(--surface); stroke-width: 2; }
+.plot .tick { fill: var(--muted); font-size: 11px; font-family: var(--f-num); }
+.plot .dlabel { fill: var(--ink); font-size: 12px; font-weight: 500; }
+.tip { position: absolute; top: 0; pointer-events: none; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 13px; display: grid; gap: 3px; min-width: 150px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12); z-index: 2; }
+.tip[hidden] { display: none; }
+.tip .row { display: flex; align-items: center; gap: 8px; }
+.tip .key { width: 12px; height: 2px; border-radius: 1px; flex: none; }
+.tip b { font-family: var(--f-num); font-weight: 500; }
+details.tbl summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+details.tbl[open] summary { margin-bottom: 8px; }
+.big-line { font-size: 16px; margin: 0; }
+.big-line b { font-family: var(--f-num); font-weight: 600; }
 @media (prefers-reduced-motion: no-preference) { .bar > i { transition: width 0.6s ease; } }
 </style>
 
@@ -128,7 +155,7 @@ dialog::backdrop { background: rgba(10, 14, 12, 0.5); }
       <div style="text-align:right"><div class="label">목표</div><div class="goal-big" id="goalTarget">100억</div></div>
     </div>
     <div class="bar" role="progressbar" aria-label="목표 달성률" id="goalBar"><i style="width:0%"></i></div>
-    <div class="ticks"><span id="goalPct">0%</span><span id="goalLeft">자산은 ‘내 원칙’ 탭에서 입력해요</span></div>
+    <div class="ticks"><span id="goalPct">0%</span><span id="goalLeft">자산은 ‘목표·자산’ 탭에서 기록해요</span></div>
   </section>
 
   <div class="notice" id="storeNotice" hidden></div>
@@ -137,6 +164,7 @@ dialog::backdrop { background: rgba(10, 14, 12, 0.5); }
     <button role="tab" data-tab="open" aria-selected="true">보유 중<span class="count" id="cntOpen"></span></button>
     <button role="tab" data-tab="closed" aria-selected="false">매매 기록<span class="count" id="cntClosed"></span></button>
     <button role="tab" data-tab="stats" aria-selected="false">통계·복기</button>
+    <button role="tab" data-tab="goal" aria-selected="false">목표·자산</button>
     <button role="tab" data-tab="rules" aria-selected="false">내 원칙</button>
   </nav>
 
@@ -224,8 +252,8 @@ const EMOTION_RISKY = ["불안", "흥분", "남들 따라(FOMO)", "손실 만회
 const SELL_LABEL = { target: "목표가 도달", stop: "손절가 도달", thesis: "매수 이유 깨짐", emotion: "감정적 매도", cash: "자금 필요", other: "기타" };
 const PLANNED = ["target", "stop", "thesis"];
 
-const state = { trades: [], settings: { ...DEFAULT_SETTINGS }, tab: "open", store: "loading", sellId: null, editId: null, addId: null, confirmDel: null };
-let tradesCol = null, settingsRef = null;
+const state = { trades: [], assets: [], settings: { ...DEFAULT_SETTINGS }, tab: "open", store: "loading", sellId: null, editId: null, addId: null, confirmDel: null };
+let tradesCol = null, assetsCol = null, settingsRef = null;
 
 const $ = (id) => document.getElementById(id);
 function el(tag, attrs = {}, ...kids) {
@@ -261,7 +289,12 @@ async function init() {
   const base = `data/users/${uid}`;
   settingsRef = db.doc(`${base}/settings`);
   tradesCol = db.doc(`${base}/journal`).collection("trades");
+  assetsCol = db.doc(`${base}/journal`).collection("assets"); // 문서 id = "2026-10" 같은 월
   state.store = "ready";
+  assetsCol.onSnapshot((snap) => {
+    state.assets = snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => a.month.localeCompare(b.month));
+    render();
+  }, onDbError);
   settingsRef.onSnapshot((snap) => {
     state.settings = { ...DEFAULT_SETTINGS, ...(snap.exists ? snap.data() : {}) };
     render();
@@ -345,22 +378,28 @@ function renderBuyLive() {
 /* ---------- 화면 ---------- */
 function render() {
   const s = state.settings;
-  const now = s.currentAssets || 0, goal = s.goal || DEFAULT_SETTINGS.goal;
+  const now = latestAssets().total || 0, goal = s.goal || DEFAULT_SETTINGS.goal;
   const p = Math.min(100, now / goal * 100);
   $("goalNow").textContent = now ? short(now) + "원" : "미입력";
   $("goalTarget").textContent = short(goal) + "원";
   $("goalBar").firstElementChild.style.width = p + "%";
   $("goalBar").setAttribute("aria-valuenow", p.toFixed(2));
   $("goalPct").textContent = now ? p.toFixed(2) + "% 달성" : "0%";
-  $("goalLeft").textContent = now ? `남은 거리 ${short(goal - now)}원` : "자산은 ‘내 원칙’ 탭에서 입력해요";
+  $("goalLeft").textContent = now ? `남은 거리 ${short(goal - now)}원` : "자산은 ‘목표·자산’ 탭에서 기록해요";
   $("cntOpen").textContent = openTrades().length || "";
   $("cntClosed").textContent = closedTrades().length || "";
   $("newBuyBtn").disabled = state.store !== "ready";
   document.querySelectorAll("nav.tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === state.tab)));
   const view = $("view");
   const active = document.activeElement;
-  if (state.tab === "rules" && view.contains(active) && active.matches("input,textarea")) return; // 입력 중엔 다시 그리지 않음
-  view.replaceChildren(state.tab === "open" ? viewOpen() : state.tab === "closed" ? viewClosed() : state.tab === "stats" ? viewStats() : viewRules());
+  if ((state.tab === "rules" || state.tab === "goal") && view.contains(active) && active.matches("input,textarea")) return; // 입력 중엔 다시 그리지 않음
+  view.replaceChildren(state.tab === "open" ? viewOpen() : state.tab === "closed" ? viewClosed() : state.tab === "stats" ? viewStats() : state.tab === "goal" ? viewGoal() : viewRules());
+}
+
+/* 가장 최근 월별 기록, 없으면 ‘내 원칙’ 탭에 적은 값 */
+function latestAssets() {
+  const last = state.assets[state.assets.length - 1];
+  return last ? { total: last.total, invest: last.invest, month: last.month } : { total: state.settings.currentAssets, invest: state.settings.capital, month: null };
 }
 
 function emptyState(title, body, withBtn) {
@@ -517,12 +556,217 @@ function viewRules() {
         field("setCapital", "투자 원금 (원)", s.capital, "비중과 손실 한도를 계산하는 기준"),
         field("setMaxWeight", "한 종목 최대 비중 (%)", s.maxWeight),
         field("setMaxLoss", "한 번에 잃어도 되는 한도 (원금의 %)", s.maxLossPct, "보통 1~2%를 권해요"),
-        field("setAssets", "현재 총자산 (원)", s.currentAssets, "목표 진행 막대에 쓰여요"),
+        field("setAssets", "현재 총자산 (원)", s.currentAssets, "‘목표·자산’ 탭에 월별 기록이 생기면 그 값을 대신 써요"),
         field("setGoal", "목표 자산 (원)", s.goal))),
     el("div", { class: "actions" }, el("button", { class: "primary", type: "button", "data-act": "save-settings", disabled: state.store !== "ready" }, "원칙과 기준 저장")));
 }
 const ruleRow = (r, i) => el("div", { class: "rule-row" }, el("input", { id: "rule-" + i, "data-rule-input": "", value: r, "aria-label": `원칙 ${i + 1}` }),
   el("button", { class: "ghost", type: "button", "data-act": "rule-del", "aria-label": "이 원칙 지우기" }, "지우기"));
+
+/* ---------- 차트 ---------- */
+const NS = "http://www.w3.org/2000/svg";
+function sv(tag, attrs = {}, text) { const n = document.createElementNS(NS, tag); for (const k in attrs) if (attrs[k] != null) n.setAttribute(k, attrs[k]); if (text != null) n.textContent = text; return n; }
+function niceMax(v) {
+  if (!(v > 0)) return 1;
+  const p = 10 ** Math.floor(Math.log10(v));
+  for (const m of [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (m * p >= v) return m * p;
+  return 10 * p;
+}
+/* series: [{name, short, color, values[], dash}] — 값 하나당 x 하나. 같은 축 하나만 씀 */
+function lineChart({ series, xLabels, tipLabels = xLabels, goal, goalLabel, ariaLabel }) {
+  const legend = el("div", { class: "legend" }, series.map((s) => el("span", {}, el("i", { style: `background:${s.color}` }), s.name)),
+    goal ? el("span", {}, el("i", { class: "dash" }), goalLabel) : null);
+  const plot = el("div", { class: "plot" });
+  const wrap = el("div", { class: "chart" }, legend, plot);
+  const n = xLabels.length;
+  let lastW = 0;
+  function draw(W) {
+    const H = 260, m = { l: 52, r: 64, t: 12, b: 26 }, iw = Math.max(40, W - m.l - m.r), ih = H - m.t - m.b;
+    const top = niceMax(Math.max(goal || 0, ...series.flatMap((s) => s.values.filter((v) => v != null))));
+    const x = (i) => m.l + (n <= 1 ? iw / 2 : (i / (n - 1)) * iw), y = (v) => m.t + ih - (v / top) * ih;
+    const svg = sv("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": ariaLabel, tabindex: "0" });
+    for (let k = 0; k <= 4; k++) {
+      const v = (top * k) / 4, yy = y(v);
+      svg.append(sv("line", { x1: m.l, x2: m.l + iw, y1: yy, y2: yy, class: k ? "grid" : "axis" }), sv("text", { x: m.l - 8, y: yy + 4, "text-anchor": "end", class: "tick" }, k ? short(v) : "0"));
+    }
+    const step = Math.max(1, Math.ceil(n / Math.max(2, Math.floor(iw / 64))));
+    for (let i = 0; i < n; i += step) svg.append(sv("text", { x: x(i), y: H - 6, "text-anchor": "middle", class: "tick" }, xLabels[i]));
+    const ends = [];
+    if (goal) { const gy = y(goal); svg.append(sv("line", { x1: m.l, x2: m.l + iw, y1: gy, y2: gy, class: "goal-line" })); ends.push({ y: gy, name: "목표" }); }
+    for (const s of series) {
+      const pts = s.values.map((v, i) => (v == null ? null : [x(i), y(v)]));
+      const d = pts.filter(Boolean).map((p, j) => (j ? "L" : "M") + p[0].toFixed(1) + "," + p[1].toFixed(1)).join("");
+      if (d) svg.append(sv("path", { d, fill: "none", stroke: s.color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+      const li = pts.map((p, i) => (p ? i : -1)).filter((i) => i >= 0).pop();
+      if (li != null) { svg.append(sv("circle", { cx: pts[li][0], cy: pts[li][1], r: 4, fill: s.color, class: "ring" })); ends.push({ y: pts[li][1], name: s.short || s.name }); }
+    }
+    ends.sort((a, b) => a.y - b.y);
+    for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 15) ends[i].y = ends[i - 1].y + 15;
+    for (const e of ends) svg.append(sv("text", { x: m.l + iw + 8, y: e.y + 4, class: "dlabel" }, e.name));
+    const cross = sv("line", { y1: m.t, y2: m.t + ih, class: "cross", visibility: "hidden" });
+    const hit = sv("rect", { x: m.l - 8, y: m.t, width: iw + 16, height: ih, fill: "transparent" });
+    svg.append(cross, hit);
+    const tip = el("div", { class: "tip", hidden: true });
+    let cur = n - 1;
+    const show = (i) => {
+      cur = Math.max(0, Math.min(n - 1, i));
+      const cx = x(cur);
+      cross.setAttribute("x1", cx); cross.setAttribute("x2", cx); cross.setAttribute("visibility", "visible");
+      tip.replaceChildren(el("div", { class: "label", text: tipLabels[cur] }),
+        ...series.map((s) => el("div", { class: "row" }, el("span", { class: "key", style: `background:${s.color}` }), el("b", { text: s.values[cur] == null ? "–" : short(s.values[cur]) + "원" }), el("span", { class: "muted", text: s.short || s.name }))));
+      tip.hidden = false;
+      const tw = tip.offsetWidth;
+      tip.style.left = Math.max(0, Math.min(W - tw, cx + 12 + tw > W ? cx - tw - 12 : cx + 12)) + "px";
+    };
+    const hide = () => { cross.setAttribute("visibility", "hidden"); tip.hidden = true; };
+    hit.addEventListener("pointermove", (e) => { const r = svg.getBoundingClientRect(); show(n <= 1 ? 0 : Math.round(((e.clientX - r.left - m.l) / iw) * (n - 1))); });
+    hit.addEventListener("pointerleave", hide);
+    svg.addEventListener("focus", () => show(cur));
+    svg.addEventListener("blur", hide);
+    svg.addEventListener("keydown", (e) => { if (e.key === "ArrowLeft") { e.preventDefault(); show(cur - 1); } else if (e.key === "ArrowRight") { e.preventDefault(); show(cur + 1); } });
+    plot.replaceChildren(svg, tip);
+  }
+  const ro = new ResizeObserver(([e]) => {
+    if (!wrap.isConnected) return ro.disconnect();
+    const W = Math.round(e.contentRect.width);
+    if (W && W !== lastW) { lastW = W; draw(W); }
+  });
+  ro.observe(plot);
+  return wrap;
+}
+function dataTable(head, rows) {
+  return el("details", { class: "tbl" }, el("summary", { text: "표로 보기" }),
+    el("div", { class: "table-wrap" }, el("table", {}, el("thead", {}, el("tr", {}, head.map((h) => el("th", { text: h })))),
+      el("tbody", {}, rows.map((r) => el("tr", {}, r.map((c, i) => el("td", { class: i ? "num" : "", text: c }))))))));
+}
+
+/* ---------- 목표 시뮬레이터 ---------- */
+const MILESTONES = [1e9, 2e9, 3e9, 5e9, 1e10];
+function simParams() {
+  const sv0 = state.settings.sim || {}, la = latestAssets();
+  return {
+    total: sv0.total ?? la.total ?? 0, invest: sv0.invest ?? la.invest ?? 0, monthly: sv0.monthly ?? 0, saveGrowth: sv0.saveGrowth ?? 0,
+    rate: sv0.rate ?? 10, otherGrowth: sv0.otherGrowth ?? 3, age: sv0.age ?? null, years: sv0.years ?? 20,
+  };
+}
+function readSim() {
+  const n = (id, d) => parseNum($(id).value) ?? d;
+  return { total: n("simTotal", 0), invest: n("simInvest", 0), monthly: n("simMonthly", 0), saveGrowth: n("simSaveGrowth", 0),
+    rate: n("simRate", 0), otherGrowth: n("simOther", 0), age: parseNum($("simAge").value), years: Math.max(1, Math.min(50, n("simYears", 20))) };
+}
+/* 투자자산은 수익률로 불어나고 매년 저축이 더해짐. 나머지 자산은 따로 상승률 적용 */
+function project(p, rate, years) {
+  let other = Math.max(0, p.total - p.invest), inv = Math.min(p.invest, p.total || p.invest);
+  const out = [other + inv];
+  for (let y = 1; y <= years; y++) {
+    other *= 1 + p.otherGrowth / 100;
+    inv = inv * (1 + rate / 100) + p.monthly * 12 * (1 + p.saveGrowth / 100) ** (y - 1);
+    out.push(other + inv);
+  }
+  return out;
+}
+function yearsTo(p, rate, target, max = 60) { const v = project(p, rate, max); const i = v.findIndex((x) => x >= target); return i < 0 ? null : i; }
+function requiredRate(p, years, target) {
+  if (project(p, 0, years)[years] >= target) return 0;
+  if (project(p, 100, years)[years] < target) return null;
+  let lo = 0, hi = 100;
+  for (let k = 0; k < 50; k++) { const mid = (lo + hi) / 2; if (project(p, mid, years)[years] >= target) hi = mid; else lo = mid; }
+  return hi;
+}
+function when(p, y) {
+  if (y == null) return "60년 안에 어려움";
+  const yr = new Date().getFullYear() + y;
+  return `${y}년 뒤 (${yr}년${p.age ? `, ${p.age + y}세` : ""})`;
+}
+function simOutput(p) {
+  const goal = state.settings.goal || DEFAULT_SETTINGS.goal;
+  const rates = [Math.max(0, p.rate - 5), p.rate, p.rate + 5];
+  const names = ["보수", "기준", "낙관"];
+  const base = yearsTo(p, p.rate, goal);
+  const need = requiredRate(p, p.years, goal);
+  const horizon = Math.max(10, Math.min(40, base ?? 40));
+  const year0 = new Date().getFullYear();
+  const xs = Array.from({ length: horizon + 1 }, (_, i) => String(year0 + i));
+  const tips = xs.map((yr, i) => `${yr}년 · ${i}년 뒤${p.age ? ` · ${p.age + i}세` : ""}`);
+  const chart = lineChart({
+    series: rates.map((r, i) => ({ name: `${names[i]} (연 ${r}%)`, short: names[i], color: `var(--s${i + 1})`, values: project(p, r, horizon) })),
+    xLabels: xs, tipLabels: tips, goal, goalLabel: `목표 ${short(goal)}원`, ariaLabel: "수익률 시나리오별 예상 자산 그래프",
+  });
+  const later = MILESTONES.filter((m) => m > p.total && m <= goal);
+  const table = el("div", { class: "table-wrap" }, el("table", {},
+    el("thead", {}, el("tr", {}, el("th", { text: "도달 자산" }), rates.map((r, i) => el("th", { text: `${names[i]} 연 ${r}%` })))),
+    el("tbody", {}, later.map((m) => el("tr", {}, el("td", { text: short(m) + "원" }), rates.map((r) => el("td", { class: "num", text: when(p, yearsTo(p, r, m)) })))))));
+  const lines = [
+    el("p", { class: "big-line" }, `기준 연 ${p.rate}%로 가면 ${short(goal)}원까지 `, el("b", { text: when(p, base) })),
+    el("p", { class: "big-line" }, `${p.years}년 뒤(${year0 + p.years}년${p.age ? `, ${p.age + p.years}세` : ""})에 ${short(goal)}원을 만들려면 투자자산이 매년 `,
+      el("b", { text: need == null ? "100% 넘게" : `${need.toFixed(1)}%` }), " 불어나야 해요"),
+  ];
+  const yearlySave = p.monthly * 12;
+  const hints = [];
+  if (p.total && p.invest / p.total < 0.2) hints.push(`투자자산이 총자산의 ${(p.invest / p.total * 100).toFixed(0)}%예요. 지금은 수익률보다 저축액이 투자자산을 키우는 속도를 정해요.`);
+  if (yearlySave && p.invest) { const r = p.invest * p.rate / 100; hints.push(`올해 기준 수익 예상 ${short(r)}원 vs 저축 ${short(yearlySave)}원 — ${r < yearlySave ? "아직은 저축이 더 큰 엔진이에요." : "이제 수익이 저축보다 큰 엔진이에요."}`); }
+  if (need != null && need > 15) hints.push(`연 ${need.toFixed(0)}%는 세계적인 투자자도 오래 유지하기 어려운 수준이에요. 저축액을 늘리거나 목표 시점을 늦추는 경우도 함께 비교해 보세요.`);
+  const plus = { ...p, monthly: p.monthly + 1000000 };
+  const yPlus = yearsTo(plus, p.rate, goal);
+  if (base != null && yPlus != null && base - yPlus > 0) hints.push(`매달 100만 원을 더 모으면 ${base - yPlus}년 빨라져요.`);
+  return el("div", { class: "list" },
+    el("div", { class: "panel" }, lines, hints.map((h) => el("p", { class: "insight", text: h }))),
+    el("div", { class: "panel" }, el("h2", { text: "수익률별 예상 자산" }), chart,
+      el("p", { class: "hint", text: "투자자산은 수익률만큼 불어나고 매년 저축이 더해져요. 그 밖의 자산은 따로 정한 상승률로만 늘어요. 세금·물가·대출 상환은 넣지 않은 단순 계산이에요." })),
+    el("div", { class: "panel" }, el("h2", { text: "중간 목표 도달 시기" }), later.length ? table : el("p", { class: "muted", text: "이미 모든 중간 목표를 넘었어요." })));
+}
+
+function viewGoal() {
+  if (state.store === "loading") return emptyState("기록을 불러오는 중…", "잠시만 기다려 주세요.");
+  const p = simParams(), la = latestAssets();
+  const f = (id, label, val, hint) => el("label", { class: "field" }, el("span", { text: label }),
+    el("input", { id, inputmode: "decimal", value: val == null || val === "" ? "" : Number(val).toLocaleString("ko-KR") }), hint ? el("span", { class: "hint", text: hint }) : null);
+  const sim = el("div", { class: "panel", id: "simForm" }, el("h2", { text: "목표 시뮬레이터" }),
+    el("div", { class: "settings-grid" },
+      f("simTotal", "현재 총자산 (원)", p.total), f("simInvest", "그중 투자자산 (원)", p.invest, "수익률이 적용되는 돈"),
+      f("simMonthly", "매달 투자에 넣는 돈 (원)", p.monthly), f("simSaveGrowth", "저축액 연 증가율 (%)", p.saveGrowth, "연봉 인상 등으로 늘어나는 비율"),
+      f("simRate", "기준 투자 수익률 (연 %)", p.rate, "±5%p로 보수·낙관도 함께 계산"), f("simOther", "그 밖의 자산 상승률 (연 %)", p.otherGrowth, "부동산·보증금 등"),
+      f("simAge", "현재 나이 (선택)", p.age), f("simYears", "목표 시점 (몇 년 뒤)", p.years)),
+    la.month || la.total ? el("div", { class: "actions" }, el("button", { type: "button", "data-act": "sim-fill" }, "최신 자산 기록으로 채우기"),
+      el("span", { class: "hint", text: la.month ? `${la.month.replace("-", "년 ")}월 기록: 총 ${short(la.total)}원, 투자 ${short(la.invest)}원` : "" })) : null);
+  return el("div", { class: "list" }, viewAssets(), sim, el("div", { id: "simOut" }, simOutput(p)));
+}
+
+function viewAssets() {
+  const list = state.assets;
+  const now = new Date(), ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const la = latestAssets();
+  const form = el("div", { class: "settings-grid" },
+    el("label", { class: "field" }, el("span", { text: "기록할 달" }), el("input", { id: "astMonth", type: "month", value: ym })),
+    el("label", { class: "field" }, el("span", { text: "총자산 (원)" }), el("input", { id: "astTotal", inputmode: "decimal", placeholder: la.total ? Number(la.total).toLocaleString("ko-KR") : "775,000,000" })),
+    el("label", { class: "field" }, el("span", { text: "그중 투자자산 평가액 (원)" }), el("input", { id: "astInvest", inputmode: "decimal", placeholder: la.invest ? Number(la.invest).toLocaleString("ko-KR") : "70,000,000" })),
+    el("label", { class: "field" }, el("span", { text: "메모 (선택)" }), el("input", { id: "astMemo", placeholder: "예: 보너스 입금, 손절 1건" })));
+  const parts = [el("h2", { text: "월별 자산 기록" }),
+    el("p", { class: "hint", text: "매달 한 번, 같은 날(예: 월급날) 총자산과 투자자산을 적어 두세요. 같은 달을 다시 저장하면 덮어써요. 맨 위 목표 막대는 가장 최근 기록을 써요." }),
+    form, el("div", { class: "actions" }, el("button", { class: "primary", type: "button", "data-act": "asset-save", disabled: state.store !== "ready" }, "이번 달 자산 저장"), el("span", { class: "hint", id: "astErr" }))];
+  if (!list.length) parts.push(el("div", { class: "empty" }, el("h3", { text: "아직 월별 기록이 없어요" }),
+    el("p", { class: "muted", text: "첫 기록을 저장하면 총자산과 투자자산이 어떻게 늘어나는지 그래프로 보여 드려요." })));
+  else {
+    const label = (mo) => mo.slice(2).replace("-", ".");
+    parts.push(lineChart({
+      series: [{ name: "총자산", color: "var(--s1)", values: list.map((a) => a.total) }, { name: "투자자산", color: "var(--s2)", values: list.map((a) => a.invest) }],
+      xLabels: list.map((a) => label(a.month)), tipLabels: list.map((a) => a.month.replace("-", "년 ") + "월" + (a.memo ? ` · ${a.memo}` : "")),
+      ariaLabel: "월별 총자산과 투자자산 그래프",
+    }));
+    const rows = list.slice().reverse().map((a, i, arr) => {
+      const prev = arr[i + 1];
+      return el("tr", {}, el("td", { text: a.month.replace("-", "년 ") + "월" }), el("td", { class: "num", text: won(a.total) }),
+        el("td", { class: "num " + (prev ? sign(a.total - prev.total) : ""), text: prev ? (a.total >= prev.total ? "+" : "") + short(a.total - prev.total) : "–" }),
+        el("td", { class: "num", text: won(a.invest) }), el("td", { text: a.memo || "" }),
+        el("td", {}, state.confirmDel === "ast-" + a.id
+          ? el("span", { class: "actions" }, el("button", { class: "danger", type: "button", "data-act": "asset-del-yes", "data-id": a.id }, "삭제"), el("button", { class: "ghost", type: "button", "data-act": "del-no" }, "취소"))
+          : el("button", { class: "ghost", type: "button", "data-act": "asset-del", "data-id": a.id }, "삭제")));
+    });
+    parts.push(el("details", { class: "tbl" }, el("summary", { text: `표로 보기 (${list.length}개월)` }),
+      el("div", { class: "table-wrap" }, el("table", {}, el("thead", {}, el("tr", {}, ["달", "총자산", "전달 대비", "투자자산", "메모", ""].map((h) => el("th", { text: h })))), el("tbody", {}, rows)))));
+  }
+  return el("div", { class: "panel" }, parts);
+}
 
 /* ---------- 동작 ---------- */
 const EDIT_FIELDS = { name: "종목명", buyDate: "매수일", buyPrice: "매수가", qty: "수량", target: "목표가", stop: "손절가", reason: "매수 이유", emotion: "기분", horizon: "보유 기간" };
@@ -676,6 +920,20 @@ $("view").addEventListener("click", async (e) => {
   else if (act === "sell") openSell(id);
   else if (act === "edit") openBuy(id);
   else if (act === "add") openAdd(id);
+  else if (act === "asset-save") {
+    const month = $("astMonth").value, total = parseNum($("astTotal").value), invest = parseNum($("astInvest").value);
+    if (!/^\d{4}-\d{2}$/.test(month) || !total) { $("astErr").textContent = "기록할 달과 총자산을 적어 주세요."; return; }
+    b.blur();
+    await write(() => assetsCol.doc(month).set({ month, total, invest: invest ?? 0, memo: $("astMemo").value.trim(), savedAt: new Date().toISOString() }),
+      `${month.replace("-", "년 ")}월 자산을 저장했어요`);
+  }
+  else if (act === "asset-del") { state.confirmDel = "ast-" + id; render(); }
+  else if (act === "asset-del-yes") { state.confirmDel = null; await write(() => assetsCol.doc(id).delete(), "자산 기록을 지웠어요"); }
+  else if (act === "sim-fill") {
+    const la = latestAssets(), fmt = (v) => (v ? Number(v).toLocaleString("ko-KR") : "");
+    $("simTotal").value = fmt(la.total); $("simInvest").value = fmt(la.invest);
+    updateSim(); saveSim();
+  }
   else if (act === "del") { state.confirmDel = id; render(); }
   else if (act === "del-no") { state.confirmDel = null; render(); }
   else if (act === "del-yes") { state.confirmDel = null; await write(() => tradesCol.doc(id).delete(), "기록을 지웠어요"); }
@@ -697,6 +955,16 @@ $("view").addEventListener("change", async (e) => {
   await write(() => tradesCol.doc(t.id).update({ currentPrice: v }));
 });
 
-try { const saved = localStorage.getItem("journal-tab"); if (["open", "closed", "stats", "rules"].includes(saved)) state.tab = saved; } catch {}
+function updateSim() { const out = $("simOut"); if (out) out.replaceChildren(simOutput(readSim())); }
+async function saveSim() {
+  if (!settingsRef) return;
+  const sim = readSim();
+  if (JSON.stringify(sim) === JSON.stringify(state.settings.sim)) return;
+  await write(() => settingsRef.set({ ...state.settings, sim }));
+}
+$("view").addEventListener("input", (e) => { if (e.target.closest("#simForm")) updateSim(); });
+$("view").addEventListener("change", (e) => { if (e.target.closest("#simForm")) saveSim(); });
+
+try { const saved = localStorage.getItem("journal-tab"); if (["open", "closed", "stats", "goal", "rules"].includes(saved)) state.tab = saved; } catch {}
 init();
 </script>
