@@ -43,4 +43,10 @@ python3 chatbot.py
 
 ## 작업 방식
 
-새 기능은 작업 브랜치에서 만들고, 확인한 뒤 Pull Request로 `main`에 합칩니다. Claude가 이어서 작업할 때 참고하는 안내는 [`CLAUDE.md`](CLAUDE.md)에 있습니다.
+Claude Code, ChatGPT Codex, Cursor 등 여러 AI 코딩 도구를 번갈아 쓰며, `main` 브랜치를 기준으로 삼습니다.
+
+- 모든 도구가 함께 읽는 안내: [`AGENTS.md`](AGENTS.md)
+- 도구를 바꿔도 이어서 일하기 위한 작업 일지: [`docs/WORKLOG.md`](docs/WORKLOG.md)
+- Claude 전용 안내(앱 게시 방법): [`CLAUDE.md`](CLAUDE.md)
+
+새 기능은 작업 브랜치에서 만들고, 확인한 뒤 Pull Request로 `main`에 합칩니다.
